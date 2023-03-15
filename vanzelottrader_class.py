@@ -103,11 +103,14 @@ class Vanzelottrader:
                    type_time: Optional[int] = None,
                    type_filling: Optional[int] = None
     ) -> order_return:
-        request = {key: value for key, value in locals().items() if value is not None}
+        # Como tratar point, ask, bid, sl e tp? Ignorar talvez, deixar pro operador calcular
 
         if self._check_volume(volume, symbol):
             return None
         
+        request = {key: value for key, value in locals().items() if value is not None}
+        
+        # Order_check() ==============================
         result_check = mt5.order_check(request)._asdict()
         print("Checagem de fundos [ORDER_CHECK], retorno: ",result_check['retcode'], result_check['comment'])
 
@@ -115,13 +118,17 @@ class Vanzelottrader:
             print('O resultado não foi positivo, retornando a função de envio de ordem. Rever a ordem.')
             return result_check
         
-
+        # Order_send() ===============================
+        result_send = mt5.order_send(request)._asdict()
+        if self._order_retcode_false_return(result_send):
+            print('O resultado não foi positivo, retornando a função de envio de ordem. Rever a ordem.')
         
-
-
-
-    
-        pass
+        # Resultados da ordem como retorno, independente de erro ou não
+        # print(f"1. order_send(): by {symbol} {volume} lots at {price} desvio={deviation} points")
+        # print("2. order_send() executada:")
+        # print(f"\tposição aberta: POSITION_TICKET={result_send['order']}")
+        return result_send
+        
 
     def cancel_order(self,
                      order_number: int
@@ -168,7 +175,7 @@ class Vanzelottrader:
     def _order_retcode_false_return(self,
                             result: dict
     ) -> bool:
-        return True if result['retcode'] != 0 else False
+        return True if result['retcode'] != mt5.TRADE_RETCODE_DONE else False
     
     # Analisa se o symbol está disponível/existe
     def _check_symbol(self, 
