@@ -4,6 +4,14 @@ import pandas as pd
 from pathlib import Path
 import os
 from typing import Union, Optional
+import pytz
+
+# Criando Timeframe_dict ==========
+
+
+
+
+
 
 
 # Tipagem =========================
@@ -11,35 +19,28 @@ from typing import Union, Optional
 Pegar o costume de utilizar o mypy para verificação de tipagem
 mypy file.py
 '''
-timeframe_type = int
+timeframe_type, action_type = int, int
 data_frame_return = Optional[pd.DataFrame]
+order_return = tuple(int, str, mt5.TradeRequest)
 
 # =================================
 class Vanzelottrader:
     # Constantes da Classe ==============
-    TIMEFRAME_DICT = {  # o quanto cada timeframe pode representar em dias? Ver estudos na função self.read_ohlc()
-            'TIMEFRAME_M1': [mt5.TIMEFRAME_M1, 60],
-            'TIMEFRAME_M2': [mt5.TIMEFRAME_M2, 120],
-            'TIMEFRAME_M3': [mt5.TIMEFRAME_M3, 180],
-            'TIMEFRAME_M4': [mt5.TIMEFRAME_M4, 240],
-            'TIMEFRAME_M5': [mt5.TIMEFRAME_M5, 300],
-            'TIMEFRAME_M6': [mt5.TIMEFRAME_M6, 360],
-            'TIMEFRAME_M10': [mt5.TIMEFRAME_M10, 600],
-            'TIMEFRAME_M12': [mt5.TIMEFRAME_M12, 720],
-            'TIMEFRAME_M15': [mt5.TIMEFRAME_M15, 900],
-            'TIMEFRAME_M20': [mt5.TIMEFRAME_M20, 1200],
-            'TIMEFRAME_M30': [mt5.TIMEFRAME_M30, 1800],
-            'TIMEFRAME_H1': [mt5.TIMEFRAME_H1, 3600],
-            'TIMEFRAME_H2': [mt5.TIMEFRAME_H2, 7200],
-            'TIMEFRAME_H3': [mt5.TIMEFRAME_H3, 10800],
-            'TIMEFRAME_H4': [mt5.TIMEFRAME_H4, 14400],
-            'TIMEFRAME_H6': [mt5.TIMEFRAME_H6, 21600],
-            'TIMEFRAME_H8': [mt5.TIMEFRAME_H8, 28800],
-            'TIMEFRAME_H12': [mt5.TIMEFRAME_H12, 43200],
-            'TIMEFRAME_D1': [mt5.TIMEFRAME_D1, 86400],
-            'TIMEFRAME_W1': [mt5.TIMEFRAME_W1, 604800],
-            'TIMEFRAME_MN1' : [mt5.TIMEFRAME_MN1, 2592000],
-    }
+    keys = ['TIMEFRAME_M1', 'TIMEFRAME_M2', 'TIMEFRAME_M3', 'TIMEFRAME_M4', 'TIMEFRAME_M5', 
+            'TIMEFRAME_M6', 'TIMEFRAME_M10', 'TIMEFRAME_M12', 'TIMEFRAME_M15', 'TIMEFRAME_M20', 
+            'TIMEFRAME_M30', 'TIMEFRAME_H1', 'TIMEFRAME_H2', 'TIMEFRAME_H3', 'TIMEFRAME_H4', 
+            'TIMEFRAME_H6', 'TIMEFRAME_H8', 'TIMEFRAME_H12', 'TIMEFRAME_D1', 'TIMEFRAME_W1', 
+            'TIMEFRAME_MN1']
+    values =[mt5.TIMEFRAME_M1, mt5.TIMEFRAME_M2, mt5.TIMEFRAME_M3, mt5.TIMEFRAME_M4, mt5.TIMEFRAME_M5,
+            mt5.TIMEFRAME_M6, mt5.TIMEFRAME_M10, mt5.TIMEFRAME_M12, mt5.TIMEFRAME_M15, mt5.TIMEFRAME_M20,
+            mt5.TIMEFRAME_M30, mt5.TIMEFRAME_H1, mt5.TIMEFRAME_H2, mt5.TIMEFRAME_H3, mt5.TIMEFRAME_H4, 
+            mt5.TIMEFRAME_H6, mt5.TIMEFRAME_H8, mt5.TIMEFRAME_H12, mt5.TIMEFRAME_D1, mt5.TIMEFRAME_W1, 
+            mt5.TIMEFRAME_MN1]
+    secs = [60, 120, 180, 240, 300, 360, 600, 720, 900, 1200, 1800, 3600, 7200, 10800, 14400, 21600, 28800,
+            43200, 86400, 604800, 2592000]
+
+    TIMEFRAME_DICT = {x: y for x, y in zip(keys, [[v,s] for v, s in zip(values, secs)])}
+    TIMEZONE = pytz.timezone('America/Sao_Paulo')
 
     def __init__(self, test, broker):
         # set broker no futuro
@@ -47,7 +48,7 @@ class Vanzelottrader:
 
     # Abaixo funções que serão utilizadas pelo usuário
     # Leitura de dados ==================
-    def get_market_data(self) -> dict:
+    def get_market_data(self) -> data_frame_return:
         pass
 
     def get_ohlc(self, 
@@ -78,26 +79,56 @@ class Vanzelottrader:
 
     def get_ticks(self, 
                   symbol: str, 
-                  initial_date: datetime = datetime(2012, 1, 1), 
-                  final_date: datetime = datetime.now()
+                  copy_ticks_type: int = mt5.COPY_TICKS_TRADE,  
+                  date_from: datetime = datetime(2012, 1, 1, tzinfo=TIMEZONE)
     ) -> data_frame_return:
+        # Importante notar que nem sempre é possível extrair os ticks da data requisitada, visto que são muitos
+        max_count = 50000000
+        ticks = mt5.copy_ticks_from(symbol, date_from, max_count, copy_ticks_type)
         
-        # df_raw = self._get_ticks()
-        return None
-        return self._slice(df_raw, initial_date, final_date)
-        
+        # create DataFrame out of the obtained data
+        df_raw = pd.DataFrame(ticks)
+        # convert time in seconds into the datetime format
+        df_raw['time'] = pd.to_datetime(df_raw['time'], unit='s')
 
+        return self._slice(df_raw, date_from)
+    
     # Trading ===========================
-    def send_order(self) :
+    def send_order(self,
+                   action: action_type,
+                   symbol: str,
+                   volume: float,
+                   type: action_type,
+                   price: float,
+                   sl: Optional[float],
+                   tp: Optional[float],
+                   deviation: Optional[int],
+                   magic: Optional[int],
+                   comment: Optional[str],
+                   type_time: Optional[int],
+                   type_filling: Optional[int]
+    ) -> order_return:
+        
         pass
 
-    def cancel_order(self):
+    def cancel_order(self,
+                     order_number: int
+    ) -> order_return:
+        # Create the request
+        request = {
+            "action": mt5.TRADE_ACTION_REMOVE,
+            "order": order_number,
+            "comment": f"Removing order #{order_number}"
+        }
+
+        # Send order to MT5
+        order_result = mt5.order_send(request)
+        return (order_result.retcode, order_result.comment, order_result.request)
+
+    def show_my_book(self) -> pd.DataFrame:
         pass
 
-    def show_my_book(self):
-        pass
-
-    def trade_history(self):
+    def trade_history(self) -> pd.DataFrame:
         pass
 
     # Infos =============================
@@ -116,7 +147,7 @@ class Vanzelottrader:
     def _slice(self, 
                df: pd.DataFrame,
                initial_date: datetime, 
-               final_date: datetime
+               final_date: datetime = datetime.now()
     ) -> data_frame_return:
         df['time'] = pd.to_datetime(df['time'])
         return df.loc[(df['time'] >= initial_date) & (df['time'] < final_date)]
