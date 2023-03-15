@@ -3,15 +3,9 @@ from datetime import date, datetime, timedelta  # poderia usar dateoffset ao inv
 import pandas as pd
 from pathlib import Path
 import os
-from typing import Union, Optional
+from typing import Union, Optional, Boolean
+from collections.abc import Mapping
 import pytz
-
-# Criando Timeframe_dict ==========
-
-
-
-
-
 
 
 # Tipagem =========================
@@ -21,7 +15,8 @@ mypy file.py
 '''
 timeframe_type, action_type = int, int
 data_frame_return = Optional[pd.DataFrame]
-order_return = tuple(int, str, mt5.TradeRequest)
+order_return = Optional[dict]
+
 
 # =================================
 class Vanzelottrader:
@@ -100,15 +95,32 @@ class Vanzelottrader:
                    volume: float,
                    type: action_type,
                    price: float,
-                   sl: Optional[float],
-                   tp: Optional[float],
-                   deviation: Optional[int],
-                   magic: Optional[int],
-                   comment: Optional[str],
-                   type_time: Optional[int],
-                   type_filling: Optional[int]
+                   sl: Optional[float] = None,
+                   tp: Optional[float] = None,
+                   deviation: Optional[int] = None,
+                   magic: Optional[int] = None,
+                   comment: Optional[str] = None,
+                   type_time: Optional[int] = None,
+                   type_filling: Optional[int] = None
     ) -> order_return:
+        request = {key: value for key, value in locals().items() if value is not None}
+
+        if self._check_volume(volume, symbol):
+            return None
         
+        result_check = mt5.order_check(request)._asdict()
+        print("Checagem de fundos [ORDER_CHECK], retorno: ",result_check['retcode'], result_check['comment'])
+
+        if self._order_retcode_false_return(result_check):
+            print('O resultado não foi positivo, retornando a função de envio de ordem. Rever a ordem.')
+            return result_check
+        
+
+        
+
+
+
+    
         pass
 
     def cancel_order(self,
@@ -122,8 +134,8 @@ class Vanzelottrader:
         }
 
         # Send order to MT5
-        order_result = mt5.order_send(request)
-        return (order_result.retcode, order_result.comment, order_result.request)
+        order_result = mt5.order_send(request)._asdict()
+        return order_result
 
     def show_my_book(self) -> pd.DataFrame:
         pass
@@ -151,3 +163,35 @@ class Vanzelottrader:
     ) -> data_frame_return:
         df['time'] = pd.to_datetime(df['time'])
         return df.loc[(df['time'] >= initial_date) & (df['time'] < final_date)]
+    
+    # Analisa o código de retorno
+    def _order_retcode_false_return(self,
+                            result: dict
+    ) -> bool:
+        return True if result['retcode'] != 0 else False
+    
+    # Analisa se o symbol está disponível/existe
+    def _check_symbol(self, 
+                     symbol: str
+    ) -> bool:
+        symbol_info = mt5.symbol_info(symbol)
+        
+        # se o símbolo não estiver disponível no MarketWatch, adicionamos
+        if not symbol_info.visible and not mt5.symbol_select(symbol,True):
+            print(f"{symbol} não foi encontrado, não é possível chamar order_check()")
+            return True
+        else: return False
+
+    # Analisa se o volume é possível de ser executado    
+    def _check_volume(self,
+                      vol: float, 
+                      symbol: str):
+        vol = float(vol)
+        maxvol = mt5.symbol_info(symbol).volumehigh
+        minvol = mt5.symbol_info(symbol).volumelow
+        if vol < minvol or vol > maxvol:
+            print(f'Erro ao declarar o volume:\n\tVolume Selecionado: {vol}\n\tVolume Mínimo: {minvol}\n\tVolume Máximo: {maxvol}')
+            return True
+        else: return False
+        
+
