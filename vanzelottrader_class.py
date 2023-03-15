@@ -129,7 +129,6 @@ class Vanzelottrader:
         # print(f"\tposição aberta: POSITION_TICKET={result_send['order']}")
         return result_send
         
-
     def cancel_order(self,
                      order_number: int
     ) -> order_return:
@@ -201,4 +200,3 @@ class Vanzelottrader:
             return True
         else: return False
         
-
